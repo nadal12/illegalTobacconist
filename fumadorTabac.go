@@ -4,7 +4,11 @@ import (
 	"fmt"
 	"github.com/streadway/amqp"
 	"log"
+	"os"
+	"reflect"
+	"strings"
 	"time"
+	"unsafe"
 )
 
 func main() {
@@ -66,13 +70,24 @@ func main() {
 		failOnError(err, "Failed to publish a message")
 
 		for d := range messages {
-			fmt.Printf("He agafat el tabac %s. Gràcies!\n", d.Body)
-			break
+			if strings.Contains(bytesToString(d.Body), "Tabac") {
+				fmt.Printf("He agafat el tabac %s. Gràcies!\n", d.Body)
+				break
+			} else if bytesToString(d.Body) == "policia" {
+				fmt.Printf("\nAnem que ve la policia!")
+				os.Exit(0)
+			}
 		}
 
 		time.Sleep(2 * time.Second)
 		fmt.Printf(". . .\nMe dones més tabac?\n")
 	}
+}
+
+func bytesToString(b []byte) string {
+	bh := (*reflect.SliceHeader)(unsafe.Pointer(&b))
+	sh := reflect.StringHeader{Data: bh.Data, Len: bh.Len}
+	return *(*string)(unsafe.Pointer(&sh))
 }
 
 func failOnError(err error, msg string) {

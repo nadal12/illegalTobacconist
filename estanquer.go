@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/streadway/amqp"
 	"log"
+	"os"
 	"reflect"
 	"unsafe"
 )
@@ -41,7 +42,7 @@ func main() {
 	)
 	failOnError(err, "Failed to declare a queue")
 
-	// Cua per realitzar les solicituts de tabac i mistos
+	// Cua per realitzar les solicituts de tabac, mistos o notificacions de la policia.
 	requests, err := ch.QueueDeclare(
 		"requests", // name
 		false,      // durable
@@ -52,7 +53,7 @@ func main() {
 	)
 	failOnError(err, "Failed to declare a queue")
 
-	// Es declara com a consumidor de la cua de peticions de tabac i mistos.
+	// Es declara com a consumidor de la cua de peticions de tabac, mistos o avisos de policia.
 	messages, err := ch.Consume(
 		requests.Name, // queue
 		"",            // consumer
@@ -72,7 +73,7 @@ func main() {
 	go func() {
 		for d := range messages {
 
-			// Mirar si el client ens ha demanat tabac o mistos.
+			// Mirar si el client ens ha demanat tabac, mistos o ens avisa de la policia.
 			if bytesToString(d.Body) == "tabac" {
 				message := fmt.Sprintf("Tabac %d", tobaccoNumber)
 				err = ch.Publish(
@@ -101,6 +102,39 @@ func main() {
 				failOnError(err, "Failed to publish a message")
 				fmt.Printf("He posat el misto %d damunt la taula\n", matchNumber)
 				matchNumber++
+			} else if bytesToString(d.Body) == "policia" {
+				message := fmt.Sprintf("policia")
+				// Avisar al fumador/s de tabac que ve la policia.
+				err = ch.Publish(
+					"",           // exchange
+					tobacco.Name, // routing key
+					false,        // mandatory
+					false,        // immediate
+					amqp.Publishing{
+						ContentType: "text/plain",
+						Body:        []byte(message),
+					})
+				failOnError(err, "Failed to publish a message")
+
+				// Avisar al fumador/s de mistos que ve la policia.
+				err = ch.Publish(
+					"",         // exchange
+					match.Name, // routing key
+					false,      // mandatory
+					false,      // immediate
+					amqp.Publishing{
+						ContentType: "text/plain",
+						Body:        []byte(message),
+					})
+				failOnError(err, "Failed to publish a message")
+
+				fmt.Printf("\nUyuyuy la policia! Men vaig\n")
+				fmt.Printf(". . . Men duc la taula!!!!\n")
+
+				//Esborrar cues i sortir
+				ch.Close()
+				conn.Close()
+				os.Exit(0)
 			}
 		}
 	}()

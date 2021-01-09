@@ -39,13 +39,13 @@ func main() {
 	failOnError(err, "Failed to register a consumer")
 
 	// Cua per realitzar les solicituts de tabac
-	tobaccoOrder, err := ch.QueueDeclare(
-		"demanarTabac", // name
-		false,          // durable
-		false,          // delete when unused
-		false,          // exclusive
-		false,          // no-wait
-		nil,            // arguments
+	requests, err := ch.QueueDeclare(
+		"requests", // name
+		false,      // durable
+		false,      // delete when unused
+		false,      // exclusive
+		false,      // no-wait
+		nil,        // arguments
 	)
 	failOnError(err, "Failed to declare a queue")
 
@@ -53,12 +53,12 @@ func main() {
 
 	for true {
 
-		message := "Vull tabac"
+		message := "tabac"
 		err = ch.Publish(
-			"",                // exchange
-			tobaccoOrder.Name, // routing key
-			false,             // mandatory
-			false,             // immediate
+			"",            // exchange
+			requests.Name, // routing key
+			false,         // mandatory
+			false,         // immediate
 			amqp.Publishing{
 				ContentType: "text/plain",
 				Body:        []byte(message),

@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"github.com/streadway/amqp"
 	"log"
+	"reflect"
+	"unsafe"
 )
 
 func main() {
@@ -28,53 +30,87 @@ func main() {
 	)
 	failOnError(err, "Failed to declare a queue")
 
-	// Cua per realitzar les solicituts de tabac
-	tobaccoOrder, err := ch.QueueDeclare(
-		"demanarTabac", // name
-		false,          // durable
-		false,          // delete when unused
-		false,          // exclusive
-		false,          // no-wait
-		nil,            // arguments
+	// Cua per enviar mistos.
+	match, err := ch.QueueDeclare(
+		"match", // name
+		false,   // durable
+		false,   // delete when unused
+		false,   // exclusive
+		false,   // no-wait
+		nil,     // arguments
 	)
 	failOnError(err, "Failed to declare a queue")
 
-	// Es declara com a consumidor de la cua de peticions de tabac.
+	// Cua per realitzar les solicituts de tabac i mistos
+	requests, err := ch.QueueDeclare(
+		"requests", // name
+		false,      // durable
+		false,      // delete when unused
+		false,      // exclusive
+		false,      // no-wait
+		nil,        // arguments
+	)
+	failOnError(err, "Failed to declare a queue")
+
+	// Es declara com a consumidor de la cua de peticions de tabac i mistos.
 	messages, err := ch.Consume(
-		tobaccoOrder.Name, // queue
-		"",                // consumer
-		true,              // auto-ack
-		false,             // exclusive
-		false,             // no-local
-		false,             // no-wait
-		nil,               // args
+		requests.Name, // queue
+		"",            // consumer
+		true,          // auto-ack
+		false,         // exclusive
+		false,         // no-local
+		false,         // no-wait
+		nil,           // args
 	)
 	failOnError(err, "Failed to register a consumer")
 
 	// Declaraciones previas al bucle.
 	var tobaccoNumber = 1
+	var matchNumber = 1
 
 	forever := make(chan bool)
 	go func() {
-		for range messages {
-			message := fmt.Sprintf("Tabac %d", tobaccoNumber)
-			err = ch.Publish(
-				"",           // exchange
-				tobacco.Name, // routing key
-				false,        // mandatory
-				false,        // immediate
-				amqp.Publishing{
-					ContentType: "text/plain",
-					Body:        []byte(message),
-				})
-			failOnError(err, "Failed to publish a message")
-			fmt.Printf("He posat el tabac %d damunt la taula\n", tobaccoNumber)
-			tobaccoNumber++
+		for d := range messages {
+
+			// Mirar si el client ens ha demanat tabac o mistos.
+			if bytesToString(d.Body) == "tabac" {
+				message := fmt.Sprintf("Tabac %d", tobaccoNumber)
+				err = ch.Publish(
+					"",           // exchange
+					tobacco.Name, // routing key
+					false,        // mandatory
+					false,        // immediate
+					amqp.Publishing{
+						ContentType: "text/plain",
+						Body:        []byte(message),
+					})
+				failOnError(err, "Failed to publish a message")
+				fmt.Printf("He posat el tabac %d damunt la taula\n", tobaccoNumber)
+				tobaccoNumber++
+			} else if bytesToString(d.Body) == "misto" {
+				message := fmt.Sprintf("Misto %d", matchNumber)
+				err = ch.Publish(
+					"",         // exchange
+					match.Name, // routing key
+					false,      // mandatory
+					false,      // immediate
+					amqp.Publishing{
+						ContentType: "text/plain",
+						Body:        []byte(message),
+					})
+				failOnError(err, "Failed to publish a message")
+				fmt.Printf("He posat el misto %d damunt la taula\n", matchNumber)
+				matchNumber++
+			}
 		}
 	}()
-
 	<-forever
+}
 
+func bytesToString(b []byte) string {
+	bh := (*reflect.SliceHeader)(unsafe.Pointer(&b))
+	sh := reflect.StringHeader{Data: bh.Data, Len: bh.Len}
+	return *(*string)(unsafe.Pointer(&sh))
 }
 
 func failOnError(err error, msg string) {

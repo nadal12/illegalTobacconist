@@ -6,16 +6,19 @@ import (
 	"log"
 	"os"
 	"reflect"
+	"time"
 	"unsafe"
 )
 
 func main() {
 	fmt.Print("Hola, som l'estanquer il·legal\n")
 
+	// Crear connexió
 	conn, err := amqp.Dial("amqp://guest:guest@localhost:5672/")
 	failOnError(err, "Failed to connect to RabbitMQ")
 	defer conn.Close()
 
+	// Obrir canal
 	ch, err := conn.Channel()
 	failOnError(err, "Failed to open a channel")
 	defer ch.Close()
@@ -75,6 +78,8 @@ func main() {
 
 			// Mirar si el client ens ha demanat tabac, mistos o ens avisa de la policia.
 			if bytesToString(d.Body) == "tabac" {
+
+				// Enviar tabac.
 				message := fmt.Sprintf("Tabac %d", tobaccoNumber)
 				err = ch.Publish(
 					"",           // exchange
@@ -86,9 +91,13 @@ func main() {
 						Body:        []byte(message),
 					})
 				failOnError(err, "Failed to publish a message")
+
+				// Mostrar per pantalla i incrementar el comptador de tabac.
 				fmt.Printf("He posat el tabac %d damunt la taula\n", tobaccoNumber)
 				tobaccoNumber++
 			} else if bytesToString(d.Body) == "misto" {
+
+				// Enviar misto
 				message := fmt.Sprintf("Misto %d", matchNumber)
 				err = ch.Publish(
 					"",         // exchange
@@ -100,11 +109,14 @@ func main() {
 						Body:        []byte(message),
 					})
 				failOnError(err, "Failed to publish a message")
+
+				// Mostrar per pantalla i incrementar el comptador de mistos.
 				fmt.Printf("He posat el misto %d damunt la taula\n", matchNumber)
 				matchNumber++
 			} else if bytesToString(d.Body) == "policia" {
-				message := fmt.Sprintf("policia")
+
 				// Avisar al fumador/s de tabac que ve la policia.
+				message := fmt.Sprintf("policia")
 				err = ch.Publish(
 					"",           // exchange
 					tobacco.Name, // routing key
@@ -129,11 +141,22 @@ func main() {
 				failOnError(err, "Failed to publish a message")
 
 				fmt.Printf("\nUyuyuy la policia! Men vaig\n")
+
+				//Espera perque els clients tinguin temps d'agafar el missatge de la cua abans d'esborrar-la.
+				time.Sleep(2 * time.Second)
+
 				fmt.Printf(". . . Men duc la taula!!!!\n")
 
-				//Esborrar cues i sortir
+				//Esborrar cues.
+				ch.QueueDelete(tobacco.Name, false, false, true)
+				ch.QueueDelete(match.Name, false, false, true)
+				ch.QueueDelete(requests.Name, false, false, true)
+
+				//Tancar canal i connexió.
 				ch.Close()
 				conn.Close()
+
+				//Sortir.
 				os.Exit(0)
 			}
 		}

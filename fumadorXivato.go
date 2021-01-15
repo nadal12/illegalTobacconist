@@ -8,10 +8,13 @@ import (
 )
 
 func main() {
+
+	// Crear connexió
 	conn, err := amqp.Dial("amqp://guest:guest@localhost:5672/")
 	failOnError(err, "Failed to connect to RabbitMQ")
 	defer conn.Close()
 
+	// Obrir canal.
 	ch, err := conn.Channel()
 	failOnError(err, "Failed to open a channel")
 	defer ch.Close()
@@ -27,8 +30,10 @@ func main() {
 	)
 	failOnError(err, "Failed to declare a queue")
 
+	// Presentació inicial.
 	fmt.Print("No som fumador. ALERTA! Que ve la policia!\n")
 
+	// Missatge de policia.
 	message := "policia"
 	err = ch.Publish(
 		"",            // exchange
@@ -41,6 +46,7 @@ func main() {
 		})
 	failOnError(err, "Failed to publish a message")
 
+	//Espera de 2 segons abans d'acabar.
 	time.Sleep(2 * time.Second)
 	fmt.Printf("\n. . .")
 }

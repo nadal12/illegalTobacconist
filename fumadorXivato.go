@@ -1,3 +1,8 @@
+/*
+Nom i llinatges: Nadal Llabrés Belmar.
+Enllaç al vídeo:
+*/
+
 package main
 
 import (
